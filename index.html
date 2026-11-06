@@ -156,14 +156,15 @@ h1{font-size:34px;font-weight:800;letter-spacing:-.02em;margin:0;line-height:1.1
 .search svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:var(--muted);pointer-events:none}
 .search input{width:100%;box-sizing:border-box;border:0;background:var(--fill);border-radius:10px;padding:9px 12px 9px 34px;font-size:16px;color:var(--fg);-webkit-appearance:none;appearance:none}
 .search input::placeholder{color:var(--muted)}
-.albums{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px 12px;margin-top:16px}
+.albums{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px 8px;margin-top:16px}
+@media (min-width:620px){.albums{grid-template-columns:repeat(4,minmax(0,1fr));gap:20px 12px}}
 .album{border:0;background:none;padding:0;text-align:left;color:inherit;min-width:0;display:flex;flex-direction:column;gap:2px}
 .album .cv{display:block;aspect-ratio:3/4;max-width:100%;border-radius:10px;overflow:hidden;background:var(--fill)}
 .album .cv.m{display:grid;grid-template-columns:2fr 1fr;grid-template-rows:1fr 1fr;gap:2px}
 .album .cv img{width:100%;height:100%;object-fit:cover;object-position:50% 0;display:block}
 .album .cv.m img:first-child{grid-row:1 / span 2}
-.album .an{font-size:14px;font-weight:700;margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.album .am{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.album .an{font-size:13px;font-weight:700;margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.album .am{font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums}
 .album-head{display:flex;justify-content:space-between;align-items:center;margin-top:10px}
 .linkbtn{background:none;border:0;color:var(--accent);font-size:15px;font-weight:600;padding:6px 0}
 .album-title{font-size:24px;font-weight:800;letter-spacing:-.02em;margin:2px 0 2px;text-wrap:balance}
@@ -995,7 +996,7 @@ async function renderStats(){
 
   // sources
   const srcs = d.bySrc || [], stot = srcs.reduce((n, x) => n + x.n, 0);
-  const srcHTML = `<section><h3>어디서 들어왔나요</h3>${srcs.length ? srcs.map(x => `<div class="share"><span>${esc(SRC_LABEL[x.src] || x.src)}</span><span class="bar"><i style="width:${pct(x.n, stot).toFixed(1)}%"></i></span><b>${num(x.n)} · ${pct(x.n, stot).toFixed(0)}%</b></div>`).join("") : `<p class="muted">아직 기록이 없어요.</p>`}<p class="hint">인스타 프로필 링크를 <b>…/moa-house/?from=insta</b>, 유튜브 설명란 링크를 <b>…/moa-house/?from=youtube</b>로 걸면 더 정확하게 구분돼요.</p></section>`;
+  const srcHTML = `<section><h3>어디서 들어왔나요</h3>${srcs.length ? srcs.map(x => `<div class="share"><span>${esc(SRC_LABEL[x.src] || x.src)}</span><span class="bar"><i style="width:${pct(x.n, stot).toFixed(1)}%"></i></span><b>${num(x.n)} · ${pct(x.n, stot).toFixed(0)}%</b></div>`).join("") : `<p class="muted">아직 기록이 없어요.</p>`}<p class="hint">인스타 프로필 링크를 <b>…/Moa-house/?from=insta</b>, 유튜브 설명란 링크를 <b>…/Moa-house/?from=youtube</b>로 걸면 더 정확하게 구분돼요.</p></section>`;
 
   // per look / per video
   const looksPerf = (d.byLook||[]).map(x => ({ ...x, l: byId.get(x.look_id) })).filter(x => x.l);
