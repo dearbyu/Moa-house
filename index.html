@@ -159,7 +159,14 @@ h1{font-size:34px;font-weight:800;letter-spacing:-.02em;margin:0;line-height:1.1
 .albums{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px 8px;margin-top:16px}
 @media (min-width:620px){.albums{grid-template-columns:repeat(4,minmax(0,1fr));gap:20px 12px}}
 .album{border:0;background:none;padding:0;text-align:left;color:inherit;min-width:0;display:flex;flex-direction:column;gap:2px}
-.album .cv{display:block;aspect-ratio:3/4;max-width:100%;border-radius:10px;overflow:hidden;background:var(--fill)}
+.album .cv{display:block;position:relative;aspect-ratio:3/4;max-width:100%;border-radius:10px;overflow:hidden;background:var(--fill)}
+.ig-badge{position:absolute;right:6px;top:6px;width:24px;height:24px;border-radius:7px;background:rgba(0,0,0,.45);color:#fff;display:grid;place-items:center}
+.ig-badge svg{width:15px;height:15px}
+.album-acts{display:flex;gap:14px}
+.ig-wrap{margin:4px 0 16px;display:flex;justify-content:center}
+.ig-wrap .instagram-media{margin:0!important;min-width:0!important;width:100%!important;max-width:540px!important}
+.ig-fallback{display:flex;align-items:center;justify-content:center;gap:8px;padding:16px;border:1px solid var(--line);border-radius:12px;color:inherit;text-decoration:none;font-weight:600}
+.ig-fallback svg{width:20px;height:20px}
 .album .cv.m{display:grid;grid-template-columns:2fr 1fr;grid-template-rows:1fr 1fr;gap:2px}
 .album .cv img{width:100%;height:100%;object-fit:cover;object-position:50% 0;display:block}
 .album .cv.m img:first-child{grid-row:1 / span 2}
@@ -273,6 +280,26 @@ const QUOTA = 1024 * 1048576;
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const SHOPS = [["ohou","오늘의집"],["coupang","쿠팡"],["29cm","29CM"],["naver","네이버쇼핑"],["etc","기타"]];
 const kindOf = t => (t && (t.kind || "").trim()) || "아이템";
+const IG_ICON = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="2"/><circle cx="17.3" cy="6.7" r="1.2" fill="currentColor"/></svg>';
+function igLink(raw){
+  try {
+    const u = new URL(/^https?:\/\//i.test(raw) ? raw : "https://" + raw);
+    if (!/(^|\.)instagram\.com$/i.test(u.hostname)) return "";
+    const m = u.pathname.match(/\/(p|reel|reels|tv)\/([A-Za-z0-9_-]+)/);
+    if (!m) return "";
+    return `https://www.instagram.com/${m[1] === "reels" ? "reel" : m[1]}/${m[2]}/`;
+  } catch { return ""; }
+}
+let igLoading = null;
+function processIg(){
+  if (!document.querySelector(".instagram-media")) return;
+  if (window.instgrm){ window.instgrm.Embeds.process(); return; }
+  if (igLoading) return;
+  igLoading = document.createElement("script");
+  igLoading.src = "https://www.instagram.com/embed.js"; igLoading.async = true;
+  igLoading.onload = () => window.instgrm && window.instgrm.Embeds.process();
+  document.body.appendChild(igLoading);
+}
 const shopLabel = k => (SHOPS.find(s => s[0] === k) || [0, k || ""])[1];
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const safeUrl = u => { try { const x = new URL(u); return /^https?:$/.test(x.protocol) ? x.href : ""; } catch { return ""; } };
@@ -339,7 +366,7 @@ const CHECK = '<svg viewBox="0 0 12 12" fill="none"><path d="M2.5 6.2 5 8.5l4.5-
 const pub = p => sb.storage.from(BUCKET).getPublicUrl(p).data.publicUrl;
 const srcOf = l => l.example ? l.src : pub(l.photo);
 const thumbOf = l => l.example ? l.src : pub(l.thumb);
-const fromRow = r => ({ id:r.id, photo:r.photo, thumb:r.thumb, w:r.w, h:r.h, bytes:r.bytes||0, date:r.date, note:r.note||"", video:r.video||"", tags:r.tags||[], createdAt:Date.parse(r.created_at)||0 });
+const fromRow = r => ({ id:r.id, photo:r.photo, thumb:r.thumb, w:r.w, h:r.h, bytes:r.bytes||0, date:r.date, note:r.note||"", video:r.video||"", insta:r.insta||"", tags:r.tags||[], createdAt:Date.parse(r.created_at)||0 });
 const usingExamples = () => real.length === 0;
 const vkey = l => (l.video || "").trim();
 const vname = k => k || "기타 사진";
@@ -353,7 +380,8 @@ function groupVideos(arr){
     ls = ls.slice().sort((a,b) => (a.createdAt||0) - (b.createdAt||0) || (a.date||"").localeCompare(b.date||""));
     const date = ls.reduce((x,l) => (l.date||"") > x ? l.date : x, "");
     const last = date + String(Math.max(...ls.map(l => l.createdAt||0))).padStart(15, "0");
-    return { k, ls, date, last };
+    const insta = (ls.find(l => l.insta) || {}).insta || "";
+    return { k, ls, date, last, insta };
   });
   groups.sort((a,b) => (a.k === "") - (b.k === "") || b.last.localeCompare(a.last));
   return groups;
@@ -389,7 +417,7 @@ function render(){
   if (tab === "items"){ looks = all; $("main").innerHTML = itemsHTML(q); return; }
   if (q){ looks = all.filter(l => hay(l).includes(q)); $("main").innerHTML = searchHTML(query.trim()); return; }
   if (tab === "videos" && album === null){ looks = []; $("main").innerHTML = albumsHTML(groups); return; }
-  if (tab === "videos"){ const g = groups.find(g => g.k === album); looks = g.ls; $("main").innerHTML = albumHTML(g); return; }
+  if (tab === "videos"){ const g = groups.find(g => g.k === album); looks = g.ls; $("main").innerHTML = albumHTML(g); processIg(); return; }
   looks = all; $("main").innerHTML = allHTML(groups);
 }
 
@@ -402,14 +430,14 @@ const emptyHTML = () => loaded ? `<div class="empty">아직 사진이 없어요<
 function albumsHTML(groups){
   if (!groups.length) return emptyHTML();
   return `<div class="albums">${groups.map(g => {
-    const p = g.ls.slice(0, 3);
-    const cv = p.length >= 3 ? `<span class="cv m">${p.map(l => `<img src="${esc(thumbOf(l))}" alt="" loading="lazy">`).join("")}</span>` : `<span class="cv"><img src="${esc(thumbOf(p[0]))}" alt="" loading="lazy"></span>`;
+    const cv = `<span class="cv"><img src="${esc(thumbOf(g.ls[0]))}" alt="" loading="lazy">${g.insta ? `<span class="ig-badge" aria-label="인스타 게시글 있음">${IG_ICON}</span>` : ""}</span>`;
     return `<button class="album" data-k="${esc(g.k)}">${cv}<span class="an">${esc(vname(g.k))}</span><span class="am">사진 ${g.ls.length}개 · ${esc(fmtDate(g.date))}</span></button>`;
   }).join("")}</div>`;
 }
 function albumHTML(g){
-  return `<div class="album-head"><button class="linkbtn" id="backBtn">‹ 영상</button>${canEdit && g.k && !usingExamples() ? '<button class="linkbtn" id="renameBtn">이름 바꾸기</button>' : ""}</div>
+  return `<div class="album-head"><button class="linkbtn" id="backBtn">‹ 영상</button>${canEdit && g.k && !usingExamples() ? `<span class="album-acts"><button class="linkbtn" id="igBtn">${g.insta ? "인스타 링크 수정" : "인스타 연결"}</button><button class="linkbtn" id="renameBtn">이름 바꾸기</button></span>` : ""}</div>
     <h2 class="album-title">${esc(vname(g.k))}</h2><p class="muted album-meta">사진 ${g.ls.length}개 · ${esc(fmtDate(g.date))}</p>
+    ${g.insta ? `<div class="ig-wrap"><blockquote class="instagram-media" data-instgrm-permalink="${esc(g.insta)}?utm_source=ig_embed" data-instgrm-version="14" data-instgrm-captioned><a href="${esc(g.insta)}" target="_blank" rel="noopener noreferrer" class="ig-fallback">${IG_ICON}<span>인스타그램에서 게시글 보기</span></a></blockquote></div>` : ""}
     <div class="grid">${g.ls.map((l,i) => cellHTML(l, i)).join("")}</div>`;
 }
 function allHTML(groups){
@@ -454,6 +482,7 @@ $("main").addEventListener("click", e => {
   if (a){ album = a.dataset.k; render(); scrollTo(0, 0); return; }
   if (e.target.closest("#backBtn")){ album = null; exitSelect(false); render(); return; }
   if (e.target.closest("#renameBtn")) openRenameSheet(album);
+  if (e.target.closest("#igBtn")) openIgSheet(album);
 });
 function setTab(t){ tab = t; [["videos","tabVideos"],["looks","tabLooks"],["items","tabItems"],["stats","tabStats"]].forEach(([k,id]) => $(id).setAttribute("aria-pressed", String(k === t))); }
 $("tabVideos").onclick = () => { if (tab === "videos") album = null; setTab("videos"); exitSelect(false); render(); };
@@ -698,6 +727,30 @@ function openVideoSheet(o){
   $("vOk").onclick = ok;
   $("vTitle").addEventListener("keydown", e => { if (e.key === "Enter") ok(); });
   setTimeout(() => $("vTitle")?.focus(), 250);
+}
+function openIgSheet(k){
+  if (!k) return;
+  const g = groupVideos(real).find(g => g.k === k); if (!g) return;
+  sheet(`<h3>인스타 게시글 연결</h3><p class="sheet-desc">게시글이나 릴스 주소를 붙여 넣으면 이 영상 맨 위에 보여요. 공개 계정의 게시글만 보여요.</p>
+    <div class="field"><label for="igUrl">인스타 주소</label><input id="igUrl" type="url" inputmode="url" value="${esc(g.insta)}" placeholder="https://www.instagram.com/reel/…" autocomplete="off"></div>
+    <div class="err" id="igErr"></div>
+    <div class="row">${g.insta ? '<button class="btn-d" id="igDel">연결 끊기</button>' : '<button class="btn-s" id="igCancel">취소</button>'}<button class="btn-p" id="igOk">저장</button></div>`);
+  const save = async v => {
+    const { error } = await sb.from("moa_looks").update({ insta: v }).eq("video", k);
+    if (error){ toast(/column|insta/i.test(error.message || "") ? "인스타 연결 설정이 아직 안 돼 있어요. Supabase에 새 설정 SQL을 실행해 주세요." : "저장하지 못했어요. 로그인 상태를 확인해 주세요.", 4500); return false; }
+    real.forEach(l => { if (vkey(l) === k) l.insta = v; });
+    closeSheet(); render(); toast(v ? "인스타 게시글을 연결했어요" : "인스타 연결을 끊었어요"); return true;
+  };
+  if ($("igCancel")) $("igCancel").onclick = closeSheet;
+  if ($("igDel")) $("igDel").onclick = () => save("");
+  $("igOk").onclick = async () => {
+    const raw = $("igUrl").value.trim();
+    if (!raw){ await save(""); return; }
+    const v = igLink(raw);
+    if (!v){ $("igErr").textContent = "인스타 게시글이나 릴스 주소를 붙여 넣어 주세요. 예: https://www.instagram.com/reel/ABC123/"; return; }
+    $("igOk").disabled = true; if (!(await save(v)) && $("igOk")) $("igOk").disabled = false;
+  };
+  setTimeout(() => $("igUrl")?.focus(), 250);
 }
 function openRenameSheet(k){
   if (!k) return;
